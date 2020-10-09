@@ -1,20 +1,21 @@
 //! FTP module.
 use std::borrow::Cow;
-use std::net::SocketAddr;
 use std::str::FromStr;
 use std::string::String;
 
+use async_std::io::{BufReader, BufWriter, Read};
+use async_std::net::{SocketAddr, TcpStream, ToSocketAddrs};
+use async_std::prelude::*;
 use chrono::offset::TimeZone;
 use chrono::{DateTime, Utc};
 use regex::Regex;
 
-use tokio::io::{
-    copy, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWriteExt, BufReader, BufWriter,
-};
-use tokio::net::{TcpStream, ToSocketAddrs};
-
 #[cfg(feature = "secure")]
-use tokio_rustls::{rustls::ClientConfig, webpki::DNSName, TlsConnector};
+use async_tls::TlsConnector;
+#[cfg(feature = "secure")]
+use rustls::ClientConfig;
+#[cfg(feature = "secure")]
+use webpki::DNSName;
 
 use crate::data_stream::DataStream;
 use crate::status;
@@ -89,7 +90,13 @@ impl FtpStream {
 
         let connector: TlsConnector = std::sync::Arc::new(config.clone()).into();
         let stream = connector
-            .connect(domain.as_ref(), self.reader.into_inner().into_tcp_stream())
+            .connect(
+                &domain,
+                self.reader
+                    .into_inner()
+                    .into_tcp_stream()
+                    .unwrap()
+            )
             .await
             .map_err(|e| FtpError::SecureError(format!("{}", e)))?;
 
@@ -106,43 +113,6 @@ impl FtpStream {
         Ok(secured_ftp_tream)
     }
 
-    /// Switch to insecure mode. If the connection is already
-    /// insecure does nothing.
-    ///
-    /// ## Example
-    ///
-    /// ```rust,no_run
-    /// use std::path::Path;
-    /// use async_ftp::FtpStream;
-    /// use tokio_rustls::rustls::{ClientConfig, RootCertStore};
-    /// use tokio_rustls::webpki::{DNSName, DNSNameRef};
-    ///
-    /// let mut root_store = RootCertStore::empty();
-    /// // root_store.add_pem_file(...);
-    /// let mut conf = ClientConfig::new();
-    /// conf.root_store = root_store;
-    /// let domain = DNSNameRef::try_from_ascii_str("www.cert-domain.com").unwrap().into();
-    /// async {
-    ///   let mut ftp_stream = FtpStream::connect("172.25.82.139:21").await.unwrap();
-    ///   let mut ftp_stream = ftp_stream.into_secure(conf, domain).await.unwrap();
-    ///   // Switch back to the insecure mode
-    ///   let mut ftp_stream = ftp_stream.into_insecure().await.unwrap();
-    ///   // Do all public things
-    ///   let _ = ftp_stream.quit();
-    /// };
-    /// ```
-    #[cfg(feature = "secure")]
-    pub async fn into_insecure(mut self) -> Result<FtpStream> {
-        // Ask the server to stop securing data
-        self.write_str("CCC\r\n").await?;
-        self.read_response(status::COMMAND_OK).await?;
-        let plain_ftp_stream = FtpStream {
-            reader: BufReader::new(DataStream::Tcp(self.reader.into_inner().into_tcp_stream())),
-            ssl_cfg: None,
-        };
-        Ok(plain_ftp_stream)
-    }
-
     /// Execute command which send data back in a separate stream
     async fn data_command(&mut self, cmd: &str) -> Result<DataStream> {
         let addr = self.pasv().await?;
@@ -157,7 +127,7 @@ impl FtpStream {
             Some((config, domain)) => {
                 let connector: TlsConnector = std::sync::Arc::new(config.clone()).into();
                 return connector
-                    .connect(domain.as_ref(), stream)
+                    .connect(domain, stream)
                     .await
                     .map(|stream| DataStream::Ssl(stream))
                     .map_err(|e| FtpError::SecureError(format!("{}", e)));
@@ -406,11 +376,12 @@ impl FtpStream {
         Ok(())
     }
 
-    async fn put_file<R: AsyncRead + Unpin>(&mut self, filename: &str, r: &mut R) -> Result<()> {
+    async fn put_file<R: Read + Unpin>(&mut self, filename: &str, r: &mut R) -> Result<()> {
         let stor_command = format!("STOR {}\r\n", filename);
         let mut data_stream = BufWriter::new(self.data_command(&stor_command).await?);
         self.read_response_in(&[status::ALREADY_OPEN, status::ABOUT_TO_SEND])
             .await?;
+        use async_std::io::copy;
         copy(r, &mut data_stream)
             .await
             .map_err(FtpError::ConnectionError)?;
@@ -418,7 +389,7 @@ impl FtpStream {
     }
 
     /// This stores a file on the server.
-    pub async fn put<R: AsyncRead + Unpin>(&mut self, filename: &str, r: &mut R) -> Result<()> {
+    pub async fn put<R: Read + Unpin>(&mut self, filename: &str, r: &mut R) -> Result<()> {
         self.put_file(filename, r).await?;
         self.read_response_in(&[
             status::CLOSING_DATA_CONNECTION,

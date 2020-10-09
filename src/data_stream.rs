@@ -1,10 +1,10 @@
+use async_std::io::{Read, Write};
+use async_std::net::TcpStream;
+#[cfg(feature = "secure")]
+use async_tls::client::TlsStream;
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use tokio::io::{AsyncRead, AsyncWrite};
-use tokio::net::TcpStream;
-#[cfg(feature = "secure")]
-use tokio_rustls::client::TlsStream;
 
 /// Data Stream used for communications
 #[pin_project::pin_project(project = DataStreamProj)]
@@ -16,11 +16,11 @@ pub enum DataStream {
 
 impl DataStream {
     /// Unwrap the stream into TcpStream. This method is only used in secure connection.
-    pub fn into_tcp_stream(self) -> TcpStream {
+    pub fn into_tcp_stream(self) -> Option<TcpStream> {
         match self {
-            DataStream::Tcp(stream) => stream,
+            DataStream::Tcp(stream) => Some(stream),
             #[cfg(feature = "secure")]
-            DataStream::Ssl(stream) => stream.into_inner().0,
+            DataStream::Ssl(_) => None,
         }
     }
 
@@ -38,12 +38,12 @@ impl DataStream {
         match self {
             DataStream::Tcp(ref stream) => stream,
             #[cfg(feature = "secure")]
-            DataStream::Ssl(ref stream) => stream.get_ref().0,
+            DataStream::Ssl(ref stream) => stream.get_ref(),
         }
     }
 }
 
-impl AsyncRead for DataStream {
+impl Read for DataStream {
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -57,7 +57,7 @@ impl AsyncRead for DataStream {
     }
 }
 
-impl AsyncWrite for DataStream {
+impl Write for DataStream {
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -78,11 +78,11 @@ impl AsyncWrite for DataStream {
         }
     }
 
-    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         match self.project() {
-            DataStreamProj::Tcp(stream) => stream.poll_shutdown(cx),
+            DataStreamProj::Tcp(stream) => stream.poll_close(cx),
             #[cfg(feature = "secure")]
-            DataStreamProj::Ssl(stream) => stream.poll_shutdown(cx),
+            DataStreamProj::Ssl(stream) => stream.poll_close(cx),
         }
     }
 }
