@@ -1,5 +1,5 @@
-use async_ftp::{FtpError, FtpStream};
-use std::io::Cursor;
+use aftp::{FtpError, FtpStream};
+use async_std::io::Cursor;
 use std::str;
 
 async fn test_ftp(addr: &str, user: &str, pass: &str) -> Result<(), FtpError> {
@@ -24,14 +24,9 @@ async fn test_ftp(addr: &str, user: &str, pass: &str) -> Result<(), FtpError> {
 }
 
 fn main() {
-    let future = test_ftp("172.25.82.139", "anonymous", "rust-ftp@github.com");
-
-    tokio::runtime::Builder::new()
-        .enable_all()
-        .build()
-        .unwrap()
-        .block_on(future)
-        .unwrap();
+    async_std::task::block_on(async {
+        test_ftp("172.25.82.139", "anonymous", "rust-ftp@github.com").await.unwrap()
+    });
 
     println!("test successful")
 }
