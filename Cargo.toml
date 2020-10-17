@@ -34,3 +34,4 @@ pin-project = "1.*"
 
 [dev-dependencies]
 async-std = { version ="1.*", features = ["attributes"] }
+claim = "0.3.*"

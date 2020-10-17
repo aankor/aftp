@@ -5,7 +5,7 @@
 //! Here is a basic usage example:
 //!
 //! ```rust
-//! use async_ftp::FtpStream;
+//! use aftp::FtpStream;
 //! async {
 //!   let mut ftp_stream = FtpStream::connect("172.25.82.139:21").await.unwrap_or_else(|err|
 //!       panic!("{}", err)
@@ -29,9 +29,9 @@
 //!
 //! ```rust,no_run
 //! use std::path::Path;
-//! use async_ftp::FtpStream;
-//! use tokio_rustls::rustls::{ClientConfig, RootCertStore};
-//! use tokio_rustls::webpki::{DNSName, DNSNameRef};
+//! use aftp::FtpStream;
+//! use rustls::{ClientConfig, RootCertStore};
+//! use webpki::{DNSName, DNSNameRef};
 //!
 //! async {
 //!   let ftp_stream = FtpStream::connect("172.25.82.139:21").await.unwrap();
@@ -46,9 +46,6 @@
 //!   let mut ftp_stream = ftp_stream.into_secure(conf, domain).await.unwrap();
 //!   ftp_stream.login("anonymous", "anonymous").await.unwrap();
 //!   // Do other secret stuff
-//!   // Switch back to the insecure mode (if required)
-//!   let mut ftp_stream = ftp_stream.into_insecure().await.unwrap();
-//!   // Do all public stuff
 //!   let _ = ftp_stream.quit().await;
 //! };
 //! ```

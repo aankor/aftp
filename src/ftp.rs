@@ -68,9 +68,9 @@ impl FtpStream {
     ///
     /// ```rust,no_run
     /// use std::path::Path;
-    /// use async_ftp::FtpStream;
-    /// use tokio_rustls::rustls::{ClientConfig, RootCertStore};
-    /// use tokio_rustls::webpki::{DNSName, DNSNameRef};
+    /// use aftp::FtpStream;
+    /// use rustls::{ClientConfig, RootCertStore};
+    /// use webpki::{DNSName, DNSNameRef};
     ///
     /// let mut root_store = RootCertStore::empty();
     /// // root_store.add_pem_file(...);
@@ -142,9 +142,9 @@ impl FtpStream {
     ///
     /// Example:
     /// ```no_run
-    /// use tokio::net::TcpStream;
+    /// use async_std::net::TcpStream;
     /// use std::time::Duration;
-    /// use async_ftp::FtpStream;
+    /// use aftp::FtpStream;
     ///
     /// async {
     ///   let stream = FtpStream::connect("172.25.82.139:21").await
@@ -283,9 +283,9 @@ impl FtpStream {
     /// data stream opened.
     ///
     /// ```
-    /// use async_ftp::{FtpStream, DataStream, FtpError};
-    /// use tokio::io::{AsyncReadExt, BufReader};
-    /// use std::io::Cursor;
+    /// use aftp::{FtpStream, DataStream, FtpError};
+    /// use async_std::io::{ReadExt, BufReader};
+    /// use async_std::io::Cursor;
     /// async {
     ///   let mut conn = FtpStream::connect("172.25.82.139:21").await.unwrap();
     ///   conn.login("Doe", "mumble").await.unwrap();
@@ -331,8 +331,8 @@ impl FtpStream {
     /// Simple way to retr a file from the server. This stores the file in memory.
     ///
     /// ```
-    /// use async_ftp::{FtpStream, FtpError};
-    /// use std::io::Cursor;
+    /// use aftp::{FtpStream, FtpError};
+    /// use async_std::io::Cursor;
     /// async {
     ///     let mut conn = FtpStream::connect("172.25.82.139:21").await?;
     ///     conn.login("Doe", "mumble").await?;
